@@ -1,7 +1,12 @@
-if _G.ScriptKey ~= "Msmsm2026" then 
-    game.Players.LocalPlayer:Kick("no key!") 
-    return 
+-- نظام المفتاح لـ MSMSM HUB
+local correctKey = "msmsms" -- المفتاح يبدأ بـ m وينتهي بـ s
+
+if _G.ScriptKey ~= correctKey then
+    -- إذا كان المفتاح خطأ، تظهر رسالة طرد (Kick) للمستخدم
+    game.Players.LocalPlayer:Kick("خطأ في المفتاح! المفتاح الصحيح يبدأ بـ m وينتهي بـ s")
+    return
 end
+print("with Msmsm Hub...")
 
 ----[[ Msmsm Hub v7.0 - Final God Mode ]]
 repeat task.wait() until game:IsLoaded()
