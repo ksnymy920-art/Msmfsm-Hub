@@ -1,5 +1,5 @@
 -- نظام المفتاح لـ MSMSM HUB
-local correctKey = "msmsms" -- المفتاح يبدأ بـ m وينتهي بـ s
+local correctKey = "msmsms" -- ا
 
 if _G.ScriptKey ~= correctKey then
     -- إذا كان المفتاح خطأ، تظهر رسالة طرد (Kick) للمستخدم
