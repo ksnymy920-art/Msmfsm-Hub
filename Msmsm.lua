@@ -1,11 +1,12 @@
-local key = _G.ScriptKey or ""
+local input = tostring(_G.ScriptKey or ""):lower() -- يحول المفتاح لحروف صغيرة للتأكد
 
-if string.sub(key, 1, 1) ~= "m" or string.sub(key, -1) ~= "s" then
+-- التحقق: هل يبدأ بـ m وينتهي بـ s؟
+if input:sub(1,1) ~= "m" or input:sub(-1) ~= "s" then
     game.Players.LocalPlayer:Kick("no key")
     return
 end
 
--- Your 348 lines of code start here --
+-- كودك الـ 348 سطر يكمل هنا --
 ----[[ Msmsm Hub v7.0 - Final God Mode ]]
 repeat task.wait() until game:IsLoaded()
 
