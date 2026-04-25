@@ -3,7 +3,7 @@ local correctKey = "msmsms" -- المفتاح يبدأ بـ m وينتهي بـ 
 
 if _G.ScriptKey ~= correctKey then
     -- إذا كان المفتاح خطأ، تظهر رسالة طرد (Kick) للمستخدم
-    game.Players.LocalPlayer:Kick("خطأ في المفتاح! المفتاح الصحيح يبدأ بـ m وينتهي بـ s")
+    game.Players.LocalPlayer:Kick("no key")
     return
 end
 print("with Msmsm Hub...")
