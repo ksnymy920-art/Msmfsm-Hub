@@ -1,4 +1,9 @@
---[[ Msmsm Hub v7.0 - Final God Mode ]]
+if _G.ScriptKey ~= "Msmsm2026" then 
+    game.Players.LocalPlayer:Kick("no key!") 
+    return 
+end
+
+----[[ Msmsm Hub v7.0 - Final God Mode ]]
 repeat task.wait() until game:IsLoaded()
 
 -- Anti-Kick Delay
