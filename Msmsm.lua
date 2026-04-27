@@ -20,13 +20,13 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local Config = {
-    Speed = 60.5, ReturnSpeed = 30, DuelEnabled = false,
-    AntiRagdollEnabled = false, SpinEnabled = false, SpinSpeed = 20,
+    Speed = 59, ReturnSpeed = 29, DuelEnabled = false,
+    AntiRagdollEnabled = false, SpinEnabled = false, SpinSpeed = 100,
     FloatEnabled = false, FloatPower = 12,
-    AutoGrabEnabled = false, GrabRadius = 200, GrabDuration = 0.1,
+    AutoGrabEnabled = false, GrabRadius = 20, GrabDuration = 0.08,
     GalaxyEnabled = false, GalaxyGravity = 70,
-    BatAimbotEnabled = false, BatSpeed = 59, BatRange = 20,
-    InventJumpEnabled = false, InventJumpPower = 60,
+    BatAimbotEnabled = false, BatSpeed = 56.5, BatRange = 20,
+    InventJumpEnabled = false, InventJumpPower = 70,
     UnwalkEnabled = false, HitboxEnabled = false, HitboxRadius = 20,
     OptimizerEnabled = false, EspEnabled = false, FovEnabled = false, AntiFlingEnabled = false,
     BrainrotDefenseEnabled = false, BrainrotDefenseSide = "left", MedusaCounterEnabled = false
@@ -1431,16 +1431,16 @@ CMT(TC[4], "ESP", false, function(s)
 end)
 
 -- ====================== FLOATING BUTTONS ======================
-createFloatBtn("LEFT\nPLAY", 90, 60, function(s)
+createFloatBtn("RIGHT\nPLAY", 90, 60, function(s)
     Config.DuelEnabled = s
     if s then startDuelRight() else stopDuel() end
-    if MenuToggles["LEFT PLAY"] then MenuToggles["LEFT PLAY"].setState(s) end
+    if MenuToggles["RIGHT PLAY"] then MenuToggles["RIGHT PLAY"].setState(s) end
 end)
 
-createFloatBtn("RIGHT\nPLAY", 160, 60, function(s)
+createFloatBtn("LEFT\nPLAY", 160, 60, function(s)
     Config.DuelEnabled = s
     if s then startDuelLeft() else stopDuel() end
-    if MenuToggles["RIGHT PLAY"] then MenuToggles["RIGHT PLAY"].setState(s) end
+    if MenuToggles["LEFT PLAY"] then MenuToggles["LEFT PLAY"].setState(s) end
 end)
 
 createFloatBtn("BAT", 90, 130, function(s)
@@ -1504,6 +1504,7 @@ if isfile and isfile(CFG) then
 end
 
 print("Part 3/4 Loaded ✅")
+
 --[[ Msmsm Hub v8.0 – Part 4/4 ]]
 
 local ProgBar = Instance.new("Frame", Screen)
