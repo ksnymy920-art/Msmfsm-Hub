@@ -63,7 +63,7 @@ end
 loadConfig()
 
 local Screen = Instance.new("ScreenGui", gethui and gethui() or CoreGui)
-Screen.Name = "MsmsmHub_v8"
+Screen.Name = "MsmsmHub"
 Screen.ResetOnSpawn = false
 Screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -1054,7 +1054,7 @@ mmStroke.Thickness = 2
 local mT = Instance.new("TextLabel", MM)
 mT.Size = UDim2.new(1, 0, 0, 30)
 mT.BackgroundTransparency = 1
-mT.Text = "Msmsm Hub v8.0"
+mT.Text = "Msmsm Hub"
 mT.TextColor3 = Color3.fromRGB(255, 255, 255)
 mT.Font = Enum.Font.GothamBlack
 mT.TextSize = 14
