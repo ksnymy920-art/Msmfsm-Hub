@@ -23,7 +23,7 @@ local Config = {
     Speed = 59, ReturnSpeed = 29, DuelEnabled = false,
     AntiRagdollEnabled = false, SpinEnabled = false, SpinSpeed = 100,
     FloatEnabled = false, FloatPower = 12,
-    AutoGrabEnabled = false, GrabRadius = 20, GrabDuration = 0.08,
+    AutoGrabEnabled = false, GrabRadius = 20, GrabDuration = 0.2,
     GalaxyEnabled = false, GalaxyGravity = 70,
     BatAimbotEnabled = false, BatSpeed = 56.5, BatRange = 20,
     InventJumpEnabled = false, InventJumpPower = 70,
@@ -63,7 +63,7 @@ end
 loadConfig()
 
 local Screen = Instance.new("ScreenGui", gethui and gethui() or CoreGui)
-Screen.Name = "MsmsmHub"
+Screen.Name = "MsmsmHub_v8"
 Screen.ResetOnSpawn = false
 Screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -476,136 +476,164 @@ function startDuelLeft()
     end)
 end
 
--- ====================== AUTO GRAB (fireproximityprompt + getconnections + بار يتحرك) ======================
-local GrabConn, IsGrabbing, GrabData, AnimalCache = nil, false, {}, {}
+-- ====================== AUTO GRAB (NOON HUB SYSTEM - الأقوى) ======================
+local AutoGrab = {
+    IsStealing = false,
+    StealData = {},
+    ProgressBar = nil,
+    StatusLabel = nil,
+    ScreenGui = nil,
+    GrabConn = nil
+}
 
-local function IsMyPlot(name)
-    local plots = workspace:FindFirstChild("Plots")
-    if not plots then return false end
-    local plot = plots:FindFirstChild(name)
-    if not plot then return false end
-    local sign = plot:FindFirstChild("PlotSign")
-    if not sign then return false end
-    local yb = sign:FindFirstChild("YourBase")
-    return yb and yb:IsA("BillboardGui") and yb.Enabled == true
+local function getHRPForSteal()
+    local c = getChar()
+    if c then
+        return c:FindFirstChild("HumanoidRootPart") or c:FindFirstChild("Torso") or c:FindFirstChild("UpperTorso")
+    end
+    return nil
 end
 
-local function ScanAnimals()
-    local result = {}
+local function CreateStealUI()
+    if AutoGrab.ScreenGui then return end
+    AutoGrab.ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+    AutoGrab.ScreenGui.Name = "MsmsmStealProgress"
+    AutoGrab.ScreenGui.ResetOnSpawn = false
+    AutoGrab.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local container = Instance.new("Frame", AutoGrab.ScreenGui)
+    container.Size = UDim2.new(0, 200, 0, 28)
+    container.Position = UDim2.new(0.5, -100, 0.05, 0)
+    container.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    container.BackgroundTransparency = 0.2
+    container.BorderSizePixel = 0
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 14)
+    local cs = Instance.new("UIStroke", container)
+    cs.Color = Color3.fromRGB(255, 255, 255); cs.Thickness = 1.5; cs.Transparency = 0.7
+
+    local bg = Instance.new("Frame", container)
+    bg.Size = UDim2.new(1, -8, 1, -8); bg.Position = UDim2.new(0, 4, 0, 4)
+    bg.BackgroundColor3 = Color3.fromRGB(20, 20, 20); bg.BackgroundTransparency = 0.3
+    bg.BorderSizePixel = 0
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 10)
+
+    AutoGrab.ProgressBar = Instance.new("Frame", bg)
+    AutoGrab.ProgressBar.Size = UDim2.new(0, 0, 1, 0)
+    AutoGrab.ProgressBar.BackgroundColor3 = Color3.fromRGB(136, 0, 255)
+    AutoGrab.ProgressBar.BorderSizePixel = 0
+    Instance.new("UICorner", AutoGrab.ProgressBar).CornerRadius = UDim.new(0, 10)
+
+    AutoGrab.StatusLabel = Instance.new("TextLabel", container)
+    AutoGrab.StatusLabel.Size = UDim2.new(1, -16, 1, 0)
+    AutoGrab.StatusLabel.Position = UDim2.new(0, 8, 0, 0)
+    AutoGrab.StatusLabel.BackgroundTransparency = 1
+    AutoGrab.StatusLabel.Text = "READY"
+    AutoGrab.StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    AutoGrab.StatusLabel.Font = Enum.Font.GothamSemibold
+    AutoGrab.StatusLabel.TextSize = 13
+    AutoGrab.StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+end
+
+local function UpdateProgressBar(duration)
+    local startTime = tick()
+    AutoGrab.StatusLabel.Text = "STEALING"
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        local elapsed = tick() - startTime
+        local p = math.min(elapsed / duration, 1)
+        if AutoGrab.ProgressBar then AutoGrab.ProgressBar.Size = UDim2.new(p, 0, 1, 0) end
+        if p >= 1 then
+            connection:Disconnect()
+            if AutoGrab.ProgressBar then AutoGrab.ProgressBar.Size = UDim2.new(0, 0, 1, 0) end
+            if AutoGrab.StatusLabel then AutoGrab.StatusLabel.Text = "READY" end
+        end
+    end)
+end
+
+local function isMyPlotByName(pn)
     local plots = workspace:FindFirstChild("Plots")
-    if not plots then return result end
+    if not plots then return false end
+    local plot = plots:FindFirstChild(pn)
+    if not plot then return false end
+    local sign = plot:FindFirstChild("PlotSign")
+    if sign then
+        local yb = sign:FindFirstChild("YourBase")
+        if yb and yb:IsA("BillboardGui") then return yb.Enabled == true end
+    end
+    return false
+end
+
+local function FindNearestPrompt()
+    local hrp = getHRPForSteal()
+    if not hrp then return nil end
+    local plots = workspace:FindFirstChild("Plots")
+    if not plots then return nil end
+    local nearest, dist = nil, math.huge
     for _, plot in ipairs(plots:GetChildren()) do
-        if plot:IsA("Model") and not IsMyPlot(plot.Name) then
-            local podiums = plot:FindFirstChild("AnimalPodiums")
-            if podiums then
-                for _, pod in ipairs(podiums:GetChildren()) do
-                    pcall(function()
-                        local base = pod:FindFirstChild("Base")
-                        local spawn = base and base:FindFirstChild("Spawn")
-                        if spawn then
-                            local att = spawn:FindFirstChild("PromptAttachment")
-                            if att then
-                                for _, ch in ipairs(att:GetChildren()) do
-                                    if ch:IsA("ProximityPrompt") then
-                                        table.insert(result, {p = ch, pos = spawn.Position})
-                                    end
-                                end
-                            end
+        if isMyPlotByName(plot.Name) then continue end
+        local pods = plot:FindFirstChild("AnimalPodiums")
+        if not pods then continue end
+        for _, pod in ipairs(pods:GetChildren()) do
+            local base = pod:FindFirstChild("Base")
+            if not base then continue end
+            local spawn = base:FindFirstChild("Spawn")
+            if not spawn then continue end
+            local d = (spawn.Position - hrp.Position).Magnitude
+            if d <= Config.GrabRadius and d < dist then
+                local att = spawn:FindFirstChild("PromptAttachment")
+                if att then
+                    for _, p in ipairs(att:GetChildren()) do
+                        if p:IsA("ProximityPrompt") and p.ActionText and p.ActionText:find("Steal") then
+                            nearest, dist = p, d
                         end
-                    end)
+                    end
                 end
             end
         end
     end
-    AnimalCache = result
+    return nearest
 end
 
-local function GetNearestAnimal()
-    local r = getHRP()
-    if not r then return nil end
-    local best, bd = nil, Config.GrabRadius
-    for _, a in ipairs(AnimalCache) do
-        local d = (a.pos - r.Position).Magnitude
-        if d < bd then bd = d; best = a end
-    end
-    return best
-end
-
-local function BuildCallbacks(prompt)
-    if GrabData[prompt] then return end
-    local data = {h = {}, t = {}, rdy = true}
-    pcall(function()
+local function ExecuteSteal(prompt)
+    if AutoGrab.IsStealing then return end
+    if not AutoGrab.StealData[prompt] then
+        AutoGrab.StealData[prompt] = {hold = {}, trigger = {}, ready = true}
         if getconnections then
             for _, c in ipairs(getconnections(prompt.PromptButtonHoldBegan)) do
-                if c.Function then table.insert(data.h, c.Function) end
+                if c.Function then table.insert(AutoGrab.StealData[prompt].hold, c.Function) end
             end
             for _, c in ipairs(getconnections(prompt.Triggered)) do
-                if c.Function then table.insert(data.t, c.Function) end
+                if c.Function then table.insert(AutoGrab.StealData[prompt].trigger, c.Function) end
             end
         end
-    end)
-    if #data.h > 0 or #data.t > 0 then GrabData[prompt] = data end
-end
-
-local function ExecGrab(animal)
-    if IsGrabbing then return end
-    local p = animal.p
-    if not p or not p.Parent then return end
-    BuildCallbacks(p)
-    local d = GrabData[p]
-    if not d or not d.rdy then return end
-    d.rdy = false; IsGrabbing = true
-
-    -- أسرع طريقة: fireproximityprompt
-    if fireproximityprompt then
-        fireproximityprompt(p)
-        -- حركة سريعة للبار
-        if pbFill then pbFill:TweenSize(UDim2.new(1, 0, 1, 0), "Out", "Linear", 0.1, true) end
-        if pbLabel then pbLabel.Text = "GRABBED!" end
-        task.wait(0.15)
-        if pbFill then pbFill:TweenSize(UDim2.new(0, 0, 1, 0), "Out", "Linear", 0.1, true) end
-        if pbLabel then pbLabel.Text = "READY" end
-        d.rdy = true; IsGrabbing = false
-        return
     end
-
-    -- طريقة getconnections مع Progress Bar يتحرك
-    local st = tick()
-    if pbLabel then pbLabel.Text = "GRABBING..." end
+    local data = AutoGrab.StealData[prompt]
+    if not data.ready then return end
+    data.ready = false; AutoGrab.IsStealing = true
+    UpdateProgressBar(Config.GrabDuration)
     task.spawn(function()
-        for _, f in ipairs(d.h) do task.spawn(f) end
-        while tick() - st < Config.GrabDuration do
-            local prog = math.clamp((tick() - st) / Config.GrabDuration, 0, 1)
-            if pbFill then pbFill.Size = UDim2.new(prog, 0, 1, 0) end
-            if pbLabel then pbLabel.Text = math.floor(prog * 100) .. "%" end
-            task.wait()
-        end
-        for _, f in ipairs(d.t) do task.spawn(f) end
-        if pbFill then pbFill.Size = UDim2.new(0, 0, 1, 0) end
-        if pbLabel then pbLabel.Text = "READY" end
-        d.rdy = true; IsGrabbing = false
+        for _, f in ipairs(data.hold) do pcall(function() f() end) end
+        task.wait(Config.GrabDuration)
+        for _, f in ipairs(data.trigger) do pcall(function() f() end) end
+        data.ready = true; AutoGrab.IsStealing = false
     end)
 end
 
 function startGrab()
-    if GrabConn then return end
-    ScanAnimals()
-    GrabConn = RunService.Heartbeat:Connect(function()
-        if not Config.AutoGrabEnabled or IsGrabbing then return end
-        local a = GetNearestAnimal()
-        if a then ExecGrab(a) end
-    end)
-    task.spawn(function()
-        while Config.AutoGrabEnabled do
-            task.wait(1.5)
-            ScanAnimals()
-        end
+    if AutoGrab.GrabConn then return end
+    CreateStealUI()
+    AutoGrab.GrabConn = RunService.Heartbeat:Connect(function()
+        if not Config.AutoGrabEnabled or AutoGrab.IsStealing then return end
+        local ok, prompt = pcall(FindNearestPrompt)
+        if ok and prompt then pcall(ExecuteSteal, prompt) end
     end)
 end
 
 function stopGrab()
-    if GrabConn then GrabConn:Disconnect(); GrabConn = nil end
-    IsGrabbing = false
+    if AutoGrab.GrabConn then AutoGrab.GrabConn:Disconnect(); AutoGrab.GrabConn = nil end
+    AutoGrab.IsStealing = false
+    if AutoGrab.ProgressBar then AutoGrab.ProgressBar.Size = UDim2.new(0, 0, 1, 0) end
+    if AutoGrab.StatusLabel then AutoGrab.StatusLabel.Text = "READY" end
 end
 
 -- ====================== BAT AIMBOT ======================
@@ -643,24 +671,17 @@ local function nearestEnemy()
 end
 function startBat()
     if BCN then return end
-    local r = getHRP()
-    local h = getHum()
+    local r = getHRP(); local h = getHum()
     if not r or not h then return end
     h.AutoRotate = false
-    if BATa then BATa:Destroy() end
-    if BAL then BAL:Destroy() end
+    if BATa then BATa:Destroy() end; if BAL then BAL:Destroy() end
     BATa = Instance.new("Attachment", r)
     BAL = Instance.new("AlignOrientation", r)
-    BAL.Attachment0 = BATa
-    BAL.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    BAL.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-    BAL.Responsiveness = 1000
-    BAL.RigidityEnabled = true
+    BAL.Attachment0 = BATa; BAL.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    BAL.MaxTorque = Vector3.new(1e9, 1e9, 1e9); BAL.Responsiveness = 1000; BAL.RigidityEnabled = true
     BCN = RunService.Heartbeat:Connect(function()
         if not Config.BatAimbotEnabled then return end
-        local c = getChar()
-        local mr = getHRP()
-        local mh = getHum()
+        local c = getChar(); local mr = getHRP(); local mh = getHum()
         if not c or not mr or not mh then return end
         mr.CanCollide = false
         local t, dist = nearestEnemy()
@@ -669,13 +690,11 @@ function startBat()
         if dist <= Config.BatRange then
             if tick() - LE >= 0.3 then
                 local b = findBat()
-                if b and b.Parent ~= c then mh:EquipTool(b) end
-                LE = tick()
+                if b and b.Parent ~= c then mh:EquipTool(b) end; LE = tick()
             end
             if tick() - LU >= 0.3 then
                 local b = findBat()
-                if b then b:Activate() end
-                LU = tick()
+                if b then b:Activate() end; LU = tick()
             end
         end
         if BAL then BAL.CFrame = CFrame.lookAt(mr.Position, Vector3.new(t.Position.X, mr.Position.Y, t.Position.Z)) end
@@ -683,12 +702,9 @@ function startBat()
 end
 function stopBat()
     if BCN then BCN:Disconnect(); BCN = nil end
-    if BAL then BAL:Destroy(); BAL = nil end
-    if BATa then BATa:Destroy(); BATa = nil end
-    local h = getHum()
-    if h then h.AutoRotate = true end
-    local r = getHRP()
-    if r then r.AssemblyLinearVelocity = Vector3.zero end
+    if BAL then BAL:Destroy(); BAL = nil end; if BATa then BATa:Destroy(); BATa = nil end
+    local h = getHum(); if h then h.AutoRotate = true end
+    local r = getHRP(); if r then r.AssemblyLinearVelocity = Vector3.zero end
 end
 
 -- ====================== INVENT JUMP ======================
@@ -735,14 +751,10 @@ end
 
 -- ====================== TP DOWN ======================
 function tpDown()
-    local c = getChar()
-    local r = getHRP()
-    local h = getHum()
+    local c = getChar(); local r = getHRP(); local h = getHum()
     if not c or not r or not h then return end
     local rp = RaycastParams.new()
-    rp.FilterDescendantsInstances = {c}
-    rp.FilterType = Enum.RaycastFilterType.Exclude
-    rp.IgnoreWater = true
+    rp.FilterDescendantsInstances = {c}; rp.FilterType = Enum.RaycastFilterType.Exclude; rp.IgnoreWater = true
     local res = workspace:Raycast(r.Position, Vector3.new(0, -1000, 0), rp)
     if res then
         local ty = res.Position.Y + (h.HipHeight or 2) + r.Size.Y / 2 + 0.3
@@ -1054,7 +1066,7 @@ mmStroke.Thickness = 2
 local mT = Instance.new("TextLabel", MM)
 mT.Size = UDim2.new(1, 0, 0, 30)
 mT.BackgroundTransparency = 1
-mT.Text = "Msmsm Hub"
+mT.Text = "Msmsm Hub v8.0"
 mT.TextColor3 = Color3.fromRGB(255, 255, 255)
 mT.Font = Enum.Font.GothamBlack
 mT.TextSize = 14
@@ -1141,6 +1153,7 @@ for i, n in ipairs(TN) do
     end)
 end
 
+-- ====================== SLIDER (يدعم الأرقام العشرية) ======================
 local function CSL(p, n, min, max, def, cb)
     local ct = Instance.new("Frame", p)
     ct.Size = UDim2.new(1, 0, 0, 42)
@@ -1192,8 +1205,16 @@ local function CSL(p, n, min, max, def, cb)
     sb.Text = ""
     sb.ZIndex = 35
 
+    local isDecimal = (max <= 5)
+
     local function up(v)
-        local c = math.clamp(math.floor(v), min, max)
+        local c
+        if isDecimal then
+            c = math.clamp(v, min, max)
+            c = math.floor(c * 100 + 0.5) / 100
+        else
+            c = math.clamp(math.floor(v), min, max)
+        end
         fl.Size = UDim2.new((c - min) / (max - min), 0, 1, 0)
         bx.Text = tostring(c)
         cb(c)
@@ -1212,7 +1233,13 @@ local function CSL(p, n, min, max, def, cb)
     UserInputService.InputChanged:Connect(function(i)
         if sd and i.UserInputType == Enum.UserInputType.MouseMovement then
             local pct = math.clamp((i.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
-            up(min + (max - min) * pct)
+            local val = min + (max - min) * pct
+            if isDecimal then
+                val = math.floor(val * 100 + 0.5) / 100
+            else
+                val = math.floor(val)
+            end
+            up(val)
         end
     end)
 end
@@ -1291,7 +1318,7 @@ CSL(TC[1], "Gravity %", 10, 95, Config.GalaxyGravity, function(v)
 end)
 CSL(TC[1], "Jump Pwr", 10, 200, Config.InventJumpPower, function(v) Config.InventJumpPower = v end)
 CSL(TC[1], "Grab Rad", 5, 200, Config.GrabRadius, function(v) Config.GrabRadius = v end)
-CSL(TC[1], "Grab Dur", 0.01, 1, Config.GrabDuration, function(v) Config.GrabDuration = v end)
+CSL(TC[1], "Grab Dur", 0.05, 2, Config.GrabDuration, function(v) Config.GrabDuration = v end)
 CSL(TC[1], "Bat Spd", 10, 200, Config.BatSpeed, function(v) Config.BatSpeed = v end)
 
 local svB = Instance.new("TextButton", TC[1])
@@ -1504,7 +1531,6 @@ if isfile and isfile(CFG) then
 end
 
 print("Part 3/4 Loaded ✅")
-
 --[[ Msmsm Hub v8.0 – Part 4/4 ]]
 
 local ProgBar = Instance.new("Frame", Screen)
@@ -1741,9 +1767,9 @@ end)
 notify("🌟 Msmsm Hub v8.0 Ready! 🌟", 3)
 
 print(string.rep("=", 55))
-print("  Msmsm Hub v8.0 - Blood Hub Duel Style")
+print("  Msmsm Hub v8.0 - Final Version")
 print("  ✅ Auto Duel: Return System (إحداثيات جديدة)")
-print("  ✅ Auto Grab: fireproximityprompt + getconnections + بار يتحرك")
+print("  ✅ Auto Grab: NOON HUB System (ما يخطي)")
 print(string.rep("=", 55))
 print("  KEYBINDS:")
 print("  RCTRL=Menu  R=Right  L=Left  T=Stop")
