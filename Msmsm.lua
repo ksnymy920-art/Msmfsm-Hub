@@ -6,9 +6,6 @@ if input:sub(1,1) ~= "m" or input:sub(-1) ~= "s" then
     return
 end
 
-
-
--- كودك الـ 348 سطر يكمل هنا --
 --[[ Msmsm Hub v8.0 – Part 1/4 ]]
 repeat task.wait() until game:IsLoaded()
 
@@ -22,16 +19,16 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 local Config = {
-    Speed = 59, ReturnSpeed = 29, DuelEnabled = false,
-    AntiRagdollEnabled = false, SpinEnabled = false, SpinSpeed = 100,
+    Speed = 61, ReturnSpeed = 30.5, DuelEnabled = false,
+    AntiRagdollEnabled = false, SpinEnabled = false, SpinSpeed = 15,
     FloatEnabled = false, FloatPower = 12,
-    AutoGrabEnabled = false, GrabRadius = 20, GrabDuration = 0.2,
+    AutoGrabEnabled = false, GrabRadius = 8, GrabDuration = 0.2,
     GalaxyEnabled = false, GalaxyGravity = 70,
-    BatAimbotEnabled = false, BatSpeed = 56.5, BatRange = 20,
-    InventJumpEnabled = false, InventJumpPower = 70,
+    BatAimbotEnabled = false, BatSpeed = 60, BatRange = 20,
+    InventJumpEnabled = false, InventJumpPower = 40,
     UnwalkEnabled = false, HitboxEnabled = false, HitboxRadius = 20,
     OptimizerEnabled = false, EspEnabled = false, FovEnabled = false, AntiFlingEnabled = false,
-    BrainrotDefenseEnabled = false, BrainrotDefenseSide = "left", MedusaCounterEnabled = false
+    MedusaCounterEnabled = false
 }
 
 local GalaxyHopEnabled, GalaxyLastHop, SpaceHeld, OriginalJump = false, 0, false, 50
@@ -405,8 +402,8 @@ function stopGalaxy()
     if h then h.JumpPower = OriginalJump end
 end
 
--- ====================== AUTO DUEL (إحداثيات جديدة - أعمق داخل البيت) ======================
-local DC, DP, DR, DRP = nil, 1, false, 1
+-- ====================== AUTO DUEL (Humanoid:Move + Velocity - آمن) ======================
+local DC, DP, DR, floatOn = nil, 1, false, false
 
 local P1 = Vector3.new(-472.61, -6.81, 90.19)
 local P2 = Vector3.new(-472.78, -6.81, 91.65)
@@ -418,67 +415,114 @@ local RE = Vector3.new(-488.10, -4.63, 25.18)
 
 function stopDuel()
     if DC then DC:Disconnect(); DC = nil end
-    DP = 1; DR = false; DRP = 1; Config.DuelEnabled = false
-    local r = getHRP()
-    if r then r.AssemblyLinearVelocity = Vector3.zero end
-end
-
-function startDuelReturn(d)
-    DR = true; DRP = 1
-    if DC then DC:Disconnect() end
-    local w = d == "right" and {P1, R1, R2} or {R1, P1, P2}
-    DC = RunService.Heartbeat:Connect(function()
-        if not Config.DuelEnabled then return end
-        local r = getHRP()
-        if not r then return end
-        local t = w[DRP]
-        if not t then stopDuel(); return end
-        local flatTarget = Vector3.new(t.X, r.Position.Y, t.Z)
-        local dir = (flatTarget - r.Position).Unit
-        r.AssemblyLinearVelocity = Vector3.new(dir.X * Config.ReturnSpeed, r.AssemblyLinearVelocity.Y, dir.Z * Config.ReturnSpeed)
-        if (flatTarget - r.Position).Magnitude < 2 then
-            if DRP < #w then DRP = DRP + 1 else stopDuel() end
-        end
-    end)
+    DP = 1; DR = false; floatOn = false; Config.DuelEnabled = false
+    local h = getHum() if h then h:Move(Vector3.zero, false) end
+    local r = getHRP() if r then r.Velocity = Vector3.zero end
 end
 
 function startDuelRight()
-    stopDuel(); Config.DuelEnabled = true; DP = 1; DR = false
-    local w = {P1, P2, PE}
+    stopDuel(); Config.DuelEnabled = true; DP = 1; DR = false; floatOn = true
+    local goPath = {P1, P2, PE}
+    local retPath = {P1, R1, R2}
+    
     DC = RunService.Heartbeat:Connect(function()
         if not Config.DuelEnabled then return end
-        local r = getHRP()
-        if not r then return end
-        local t = w[DP]
-        if not t then startDuelReturn("right"); return end
-        local flatTarget = Vector3.new(t.X, r.Position.Y, t.Z)
-        local dir = (flatTarget - r.Position).Unit
-        r.AssemblyLinearVelocity = Vector3.new(dir.X * Config.Speed, r.AssemblyLinearVelocity.Y, dir.Z * Config.Speed)
-        if (flatTarget - r.Position).Magnitude < 2 then
-            if DP < #w then DP = DP + 1 else startDuelReturn("right") end
+        local hum = getHum(); local r = getHRP()
+        if not hum or not r then return end
+        
+        local path = DR and retPath or goPath
+        if DP > #path then stopDuel(); return end
+        
+        local target = path[DP]
+        local flat = Vector3.new(target.X, r.Position.Y, target.Z)
+        local dist = (flat - r.Position).Magnitude
+        local dir = (flat - r.Position).Unit
+        local speed = DR and Config.ReturnSpeed or Config.Speed
+        
+        if floatOn and not DR then
+            local rp = RaycastParams.new() rp.FilterType = Enum.RaycastFilterType.Exclude
+            local c = getChar() if c then rp.FilterDescendantsInstances = {c} end
+            local hit = workspace:Raycast(r.Position, Vector3.new(0, -50, 0), rp)
+            if hit then
+                local targetY = hit.Position.Y + 5
+                local currentY = r.Position.Y
+                if currentY < targetY then
+                    r.Velocity = Vector3.new(dir.X * speed, 8, dir.Z * speed)
+                elseif currentY > targetY + 2 then
+                    r.Velocity = Vector3.new(dir.X * speed, -5, dir.Z * speed)
+                else
+                    r.Velocity = Vector3.new(dir.X * speed, 2, dir.Z * speed)
+                end
+            end
+        else
+            r.Velocity = Vector3.new(dir.X * speed, r.Velocity.Y, dir.Z * speed)
+        end
+        
+        hum:Move(dir, false)
+        
+        if dist < 2 then
+            DP = DP + 1
+            if not DR and DP > #goPath then
+                floatOn = false
+                DR = true
+                DP = 1
+            end
         end
     end)
 end
 
 function startDuelLeft()
-    stopDuel(); Config.DuelEnabled = true; DP = 1; DR = false
-    local w = {R1, R2, RE}
+    stopDuel(); Config.DuelEnabled = true; DP = 1; DR = false; floatOn = true
+    local goPath = {R1, R2, RE}
+    local retPath = {R1, P1, P2}
+    
     DC = RunService.Heartbeat:Connect(function()
         if not Config.DuelEnabled then return end
-        local r = getHRP()
-        if not r then return end
-        local t = w[DP]
-        if not t then startDuelReturn("left"); return end
-        local flatTarget = Vector3.new(t.X, r.Position.Y, t.Z)
-        local dir = (flatTarget - r.Position).Unit
-        r.AssemblyLinearVelocity = Vector3.new(dir.X * Config.Speed, r.AssemblyLinearVelocity.Y, dir.Z * Config.Speed)
-        if (flatTarget - r.Position).Magnitude < 2 then
-            if DP < #w then DP = DP + 1 else startDuelReturn("left") end
+        local hum = getHum(); local r = getHRP()
+        if not hum or not r then return end
+        
+        local path = DR and retPath or goPath
+        if DP > #path then stopDuel(); return end
+        
+        local target = path[DP]
+        local flat = Vector3.new(target.X, r.Position.Y, target.Z)
+        local dist = (flat - r.Position).Magnitude
+        local dir = (flat - r.Position).Unit
+        local speed = DR and Config.ReturnSpeed or Config.Speed
+        
+        if floatOn and not DR then
+            local rp = RaycastParams.new() rp.FilterType = Enum.RaycastFilterType.Exclude
+            local c = getChar() if c then rp.FilterDescendantsInstances = {c} end
+            local hit = workspace:Raycast(r.Position, Vector3.new(0, -50, 0), rp)
+            if hit then
+                local targetY = hit.Position.Y + 5
+                local currentY = r.Position.Y
+                if currentY < targetY then
+                    r.Velocity = Vector3.new(dir.X * speed, 8, dir.Z * speed)
+                elseif currentY > targetY + 2 then
+                    r.Velocity = Vector3.new(dir.X * speed, -5, dir.Z * speed)
+                else
+                    r.Velocity = Vector3.new(dir.X * speed, 2, dir.Z * speed)
+                end
+            end
+        else
+            r.Velocity = Vector3.new(dir.X * speed, r.Velocity.Y, dir.Z * speed)
+        end
+        
+        hum:Move(dir, false)
+        
+        if dist < 2 then
+            DP = DP + 1
+            if not DR and DP > #goPath then
+                floatOn = false
+                DR = true
+                DP = 1
+            end
         end
     end)
 end
 
--- ====================== AUTO GRAB (NOON HUB SYSTEM - الأقوى) ======================
+-- ====================== AUTO GRAB ======================
 local AutoGrab = {
     IsStealing = false,
     StealData = {},
@@ -638,8 +682,8 @@ function stopGrab()
     if AutoGrab.StatusLabel then AutoGrab.StatusLabel.Text = "READY" end
 end
 
--- ====================== BAT AIMBOT ======================
-local BCN, BAL, BATa = nil, nil, nil
+-- ====================== BAT AIMBOT (Humanoid:Move + Velocity) ======================
+local BCN = nil
 local LE, LU = 0, 0
 local function findBat()
     local c = getChar()
@@ -673,40 +717,42 @@ local function nearestEnemy()
 end
 function startBat()
     if BCN then return end
-    local r = getHRP(); local h = getHum()
-    if not r or not h then return end
-    h.AutoRotate = false
-    if BATa then BATa:Destroy() end; if BAL then BAL:Destroy() end
-    BATa = Instance.new("Attachment", r)
-    BAL = Instance.new("AlignOrientation", r)
-    BAL.Attachment0 = BATa; BAL.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    BAL.MaxTorque = Vector3.new(1e9, 1e9, 1e9); BAL.Responsiveness = 1000; BAL.RigidityEnabled = true
     BCN = RunService.Heartbeat:Connect(function()
         if not Config.BatAimbotEnabled then return end
-        local c = getChar(); local mr = getHRP(); local mh = getHum()
-        if not c or not mr or not mh then return end
-        mr.CanCollide = false
+        local c = getChar(); local hum = getHum(); local r = getHRP()
+        if not c or not hum or not r then return end
+        r.CanCollide = false
         local t, dist = nearestEnemy()
-        if not t then return end
-        mr.AssemblyLinearVelocity = (t.Position - mr.Position).Unit * Config.BatSpeed
+        if not t then
+            hum:Move(Vector3.zero, false)
+            r.Velocity = Vector3.zero
+            return
+        end
+        
+        local dir = (t.Position - r.Position).Unit
+        if dist > 1.5 then
+            r.Velocity = Vector3.new(dir.X * Config.BatSpeed, r.Velocity.Y, dir.Z * Config.BatSpeed)
+        else
+            r.Velocity = t.AssemblyLinearVelocity
+        end
+        hum:Move(dir, false)
+        
         if dist <= Config.BatRange then
             if tick() - LE >= 0.3 then
                 local b = findBat()
-                if b and b.Parent ~= c then mh:EquipTool(b) end; LE = tick()
+                if b and b.Parent ~= c then hum:EquipTool(b) end; LE = tick()
             end
             if tick() - LU >= 0.3 then
                 local b = findBat()
                 if b then b:Activate() end; LU = tick()
             end
         end
-        if BAL then BAL.CFrame = CFrame.lookAt(mr.Position, Vector3.new(t.Position.X, mr.Position.Y, t.Position.Z)) end
     end)
 end
 function stopBat()
     if BCN then BCN:Disconnect(); BCN = nil end
-    if BAL then BAL:Destroy(); BAL = nil end; if BATa then BATa:Destroy(); BATa = nil end
-    local h = getHum(); if h then h.AutoRotate = true end
-    local r = getHRP(); if r then r.AssemblyLinearVelocity = Vector3.zero end
+    local hum = getHum(); if hum then hum:Move(Vector3.zero, false) end
+    local r = getHRP(); if r then r.Velocity = Vector3.zero end
 end
 
 -- ====================== INVENT JUMP ======================
@@ -877,73 +923,6 @@ function stopAntiFling()
     if AFC then AFC:Disconnect(); AFC = nil end
 end
 
--- ====================== BRAINROT DEFENSE ======================
-local WasRagdolled, AlreadyTP = false, false
-local DEFENSE_LEFT_FINAL = Vector3.new(-483.59, -5.04, 104.24)
-local DEFENSE_RIGHT_FINAL = Vector3.new(-483.51, -5.10, 18.89)
-local CHECKPOINT_A = Vector3.new(-472.60, -7.00, 57.52)
-local CHECKPOINT_L = Vector3.new(-472.65, -7.00, 95.69)
-local CHECKPOINT_R = Vector3.new(-471.76, -7.00, 26.22)
-
-local function DoVortexTP()
-    if AlreadyTP then return end
-    AlreadyTP = true
-    task.spawn(function()
-        task.wait(0.15)
-        local cc = getChar()
-        if not cc then AlreadyTP = false; return end
-        for _, v in ipairs(cc:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.AssemblyLinearVelocity = Vector3.zero
-                v.AssemblyAngularVelocity = Vector3.zero
-            end
-        end
-        if Config.BrainrotDefenseSide == "left" then
-            cc:PivotTo(CFrame.new(CHECKPOINT_A + Vector3.new(0, 3, 0)))
-            task.wait(0.08)
-            cc:PivotTo(CFrame.new(CHECKPOINT_L + Vector3.new(0, 3, 0)))
-            task.wait(0.08)
-            cc:PivotTo(CFrame.new(DEFENSE_LEFT_FINAL + Vector3.new(0, 3, 0)))
-        else
-            cc:PivotTo(CFrame.new(CHECKPOINT_A + Vector3.new(0, 3, 0)))
-            task.wait(0.08)
-            cc:PivotTo(CFrame.new(CHECKPOINT_R + Vector3.new(0, 3, 0)))
-            task.wait(0.08)
-            cc:PivotTo(CFrame.new(DEFENSE_RIGHT_FINAL + Vector3.new(0, 3, 0)))
-        end
-        task.wait(1.5)
-        AlreadyTP = false
-    end)
-end
-
-local function CheckRagdollState(c)
-    local hum = c:FindFirstChildOfClass("Humanoid")
-    if not hum then return false end
-    local state = hum:GetState()
-    return state == Enum.HumanoidStateType.Physics or state == Enum.HumanoidStateType.FallingDown or state == Enum.HumanoidStateType.Ragdoll
-end
-
-local BrainrotConn = nil
-function startBrainrotDefense()
-    if BrainrotConn then return end
-    BrainrotConn = RunService.Heartbeat:Connect(function()
-        if not Config.BrainrotDefenseEnabled then return end
-        if Config.BatAimbotEnabled then return end
-        if Config.DuelEnabled then return end
-        local c = getChar()
-        if not c then return end
-        local ragNow = CheckRagdollState(c)
-        if ragNow and not WasRagdolled then DoVortexTP() end
-        WasRagdolled = ragNow
-    end)
-end
-function stopBrainrotDefense()
-    if BrainrotConn then BrainrotConn:Disconnect(); BrainrotConn = nil end
-end
-LocalPlayer.CharacterAdded:Connect(function()
-    AlreadyTP = false; WasRagdolled = false
-end)
-
 -- ====================== MEDUSA COUNTER ======================
 local MEDUSA_COOLDOWN = 25
 local MedusaLastUsed = 0
@@ -1032,7 +1011,6 @@ LocalPlayer.CharacterAdded:Connect(function(c)
     if Config.GalaxyEnabled then stopGalaxy(); startGalaxy() end
     if Config.UnwalkEnabled then stopUnwalk(); startUnwalk() end
     if Config.DuelEnabled then stopDuel(); Config.DuelEnabled = false end
-    if Config.BrainrotDefenseEnabled then startBrainrotDefense() end
     if Config.MedusaCounterEnabled then SetupMedusaCounter(c) end
     local h = c:FindFirstChildOfClass("Humanoid")
     if h and h.JumpPower > 0 then OriginalJump = h.JumpPower end
@@ -1047,7 +1025,6 @@ end
 if Config.SpinEnabled then startSpin() end
 if Config.AntiRagdollEnabled then startAntiRagdoll() end
 if Config.FloatEnabled then startFloat() end
-if Config.BrainrotDefenseEnabled then startBrainrotDefense() end
 if Config.MedusaCounterEnabled and LocalPlayer.Character then SetupMedusaCounter(LocalPlayer.Character) end
 
 print("Part 2/4 Loaded ✅")
@@ -1396,47 +1373,6 @@ CMT(TC[3], "Anti Fling", false, function(s)
     Config.AntiFlingEnabled = s
     if s then startAntiFling() else stopAntiFling() end
 end)
-CMT(TC[3], "Brainrot Def", false, function(s)
-    Config.BrainrotDefenseEnabled = s
-    if s then startBrainrotDefense() else stopBrainrotDefense() end
-end)
-
--- Defense Side Selector
-do
-    local ct = Instance.new("Frame", TC[3])
-    ct.Size = UDim2.new(1, 0, 0, 30)
-    ct.BackgroundTransparency = 1
-    ct.ZIndex = 32
-    local lb = Instance.new("TextLabel", ct)
-    lb.Size = UDim2.new(0, 80, 1, 0)
-    lb.Position = UDim2.new(0, 6, 0, 0)
-    lb.BackgroundTransparency = 1
-    lb.Text = "Defense Side"
-    lb.TextColor3 = Color3.fromRGB(255, 255, 255)
-    lb.Font = Enum.Font.GothamBold
-    lb.TextSize = 11
-    lb.TextXAlignment = Enum.TextXAlignment.Left
-    lb.ZIndex = 33
-    local sideBtn = Instance.new("TextButton", ct)
-    sideBtn.Size = UDim2.new(0, 42, 0, 18)
-    sideBtn.Position = UDim2.new(1, -48, 0.5, -9)
-    sideBtn.BackgroundColor3 = Color3.fromRGB(30, 10, 60)
-    sideBtn.BorderSizePixel = 0
-    sideBtn.Text = Config.BrainrotDefenseSide == "left" and "LEFT" or "RIGHT"
-    sideBtn.TextColor3 = Color3.fromRGB(200, 140, 255)
-    sideBtn.Font = Enum.Font.GothamBold
-    sideBtn.TextSize = 8
-    sideBtn.ZIndex = 33
-    Instance.new("UICorner", sideBtn).CornerRadius = UDim.new(0, 4)
-    local sideStroke = Instance.new("UIStroke", sideBtn)
-    sideStroke.Color = Color3.fromRGB(136, 0, 255)
-    sideBtn.MouseButton1Click:Connect(function()
-        Config.BrainrotDefenseSide = Config.BrainrotDefenseSide == "left" and "right" or "left"
-        sideBtn.Text = Config.BrainrotDefenseSide == "left" and "LEFT" or "RIGHT"
-        saveConfig()
-    end)
-end
-
 CMT(TC[3], "Medusa Counter", false, function(s)
     Config.MedusaCounterEnabled = s
     if s and LocalPlayer.Character then
@@ -1718,13 +1654,6 @@ UserInputService.InputBegan:Connect(function(input, gpe)
         return
     end
 
-    if input.KeyCode == Enum.KeyCode.H then
-        Config.BrainrotDefenseEnabled = not Config.BrainrotDefenseEnabled
-        if Config.BrainrotDefenseEnabled then startBrainrotDefense() else stopBrainrotDefense() end
-        if MenuToggles["Brainrot Def"] then MenuToggles["Brainrot Def"].setState(Config.BrainrotDefenseEnabled) end
-        return
-    end
-
     if input.KeyCode == Enum.KeyCode.Semicolon then
         Config.MedusaCounterEnabled = not Config.MedusaCounterEnabled
         if Config.MedusaCounterEnabled and LocalPlayer.Character then
@@ -1760,7 +1689,6 @@ Screen.Destroying:Connect(function()
     stopGrab()
     stopBat()
     stopAntiFling()
-    stopBrainrotDefense()
     StopMedusaCounter()
     saveConfig()
 end)
@@ -1770,17 +1698,8 @@ notify("🌟 Msmsm Hub v8.0 Ready! 🌟", 3)
 
 print(string.rep("=", 55))
 print("  Msmsm Hub v8.0 - Final Version")
-print("  ✅ Auto Duel: Return System (إحداثيات جديدة)")
-print("  ✅ Auto Grab: NOON HUB System (ما يخطي)")
-print(string.rep("=", 55))
-print("  KEYBINDS:")
-print("  RCTRL=Menu  R=Right  L=Left  T=Stop")
-print("  G=Grab  B=Bat  P=Drop  F=Float  V=Spin")
-print("  J=Jump  U=TP    N=Unwalk  Y=Galaxy")
-print("  X=Xray  M=AntiFling  Z=Hitbox  O=FOV")
-print("  K=ESP   H=Brainrot  ;=Medusa")
-print(string.rep("=", 55))
-
--- ============================================================
--- END OF MSMSM HUB v8.0
--- ============================================================
+print("  ✅ Auto Duel: Humanoid:Move + Velocity (آمن)")
+print("  ✅ Auto Grab: NOON HUB System")
+print("  ✅ Float خفيف 5 ستاد")
+print("  ✅ Bat Aimbot: Humanoid:Move + Velocity")
+print("  📱 discord.gg/2jUDW8DC")
