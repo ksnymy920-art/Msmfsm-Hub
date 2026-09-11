@@ -6,6 +6,8 @@ if input:sub(1,1) ~= "m" or input:sub(-1) ~= "s" then
     return
 end
 
+
+
 -- كودك الـ 348 سطر يكمل هنا --
 --[[ Msmsm Hub v8.0 – Part 1/4 ]]
 repeat task.wait() until game:IsLoaded()
